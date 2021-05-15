@@ -47,15 +47,20 @@ using System.Collections.Generic;" );
                 {SyntaxFacts.GetText( _info.DeclaredAccessibility )} class {baseClassName}
                 {{
             " );
-
-            GenerateProperties();
-
+            GenerateMethodsFromSchema( _json, "" );
             if( hasNamespace )
             {
                 _s.Append( '}' );
             }
             _s.Append( '}' );
             return _s.ToString();
+        }
+
+        void GenerateMethodsFromSchema( JObject schema, string defName )
+        {
+            GeneratePropertySource( schema, defName );
+            GeneratePropertiesSource( schema );
+            GenerateDefinitions( schema );
         }
 
         static string GetBaseTypeReader( JObject property )
@@ -73,12 +78,14 @@ using System.Collections.Generic;" );
         static bool IsArray( JObject property )
             => property["type"]?.ToString() is "array";
 
-        static string CamelToPascal( string name ) => name.Substring( 0, 1 ).ToUpper() + name.Substring( 1 );
+        static string CamelToPascal( string name )
+            => string.IsNullOrWhiteSpace( name ) ?
+              name
+            : name.Substring( 0, 1 ).ToUpper() + name.Substring( 1 );
 
-        void AppendArrayVisit( JObject property )
+        void AppendArrayVisit( JObject property, string className )
         {
             JObject arrayTypeDef = property["items"] as JObject;
-            string csType = JSTypeToCS( property["items"] as JObject );
 
             _s.Append( $@"reader.Read(); //OpenArray
 reader.Read(); //First element
@@ -96,13 +103,13 @@ while( reader.TokenType != JsonTokenType.EndArray )
             }
             else
             {
-                _s.AppendLine( $"Visit{csType}(reader);" );
+                _s.AppendLine( $"Visit{className}(reader);" );
             }
             _s.AppendLine( "}" );
 
         }
 
-        void AppendArrayRead( JObject property )
+        void AppendArrayRead( JObject property, string className )
         {
             JObject arrayTypeDef = property["items"] as JObject;
             string csType = JSTypeToCS( property["items"] as JObject );
@@ -124,7 +131,7 @@ arr.Add(" );
             }
             else
             {
-                _s.Append( $"Read{csType}()" );
+                _s.Append( $"Read{className}()" );
             }
             _s.Append( @");
     reader.Read();
@@ -134,16 +141,14 @@ return arr;
 
         }
 
-        void GenerateProperty( JProperty propertyObj )
+        void GeneratePropertySource( JObject definition, string defName )
         {
-            if( propertyObj.Name.StartsWith( "$" ) ) return;
-            JObject property = (JObject)propertyObj.Value;
-            string className = CamelToPascal( propertyObj.Name );
-            AppendVisitorDeclaration( property, className, csType );
-            AppendReadDeclaration( property, csType, className );
+            string className = CamelToPascal( defName );
+            AppendVisitorDeclaration( definition, className );
+            AppendReadDeclaration( definition, className );
         }
 
-        private void AppendVisitorDeclaration( JObject property, string className, string csType )
+        private void AppendVisitorDeclaration( JObject property, string className )
         {
             _s.Append( $@"
         /// <summary>
@@ -158,15 +163,15 @@ return arr;
             }
             else if( IsArray( property ) )
             {
-                AppendArrayVisit( property );
+                AppendArrayVisit( property, className );
             }
             else
             {
-                _s.AppendLine( $"Visit{csType}(reader);" );
+                _s.AppendLine( $"Visit{className}(reader);" );
             }
         }
 
-        void AppendReadDeclaration( JObject property, string csType, string className )
+        void AppendReadDeclaration( JObject property, string className )
         {
             _s.Append(
     $@"        }}
@@ -175,7 +180,7 @@ return arr;
         /// {property["description"]}
         /// </summary>
         /// <returns>The parsed value.</returns>
-        protected {csType} Read{className}(Utf8JsonReader reader)
+        protected {JSTypeToCS( property )} Read{className}(Utf8JsonReader reader)
         {{
 " );
             if( IsBaseType( property ) )
@@ -184,11 +189,11 @@ return arr;
             }
             else if( IsArray( property ) )
             {
-                AppendArrayRead( property );
+                AppendArrayRead( property, className );
             }
             else
             {
-                _s.AppendLine( $"Read{csType}(reader);" );
+                _s.AppendLine( $"Read{className}(reader);" );
             }
             _s.AppendLine( "}" );
         }
@@ -215,15 +220,26 @@ return arr;
                         if( useNamespace ) typeName = _info.BaseType.Name + "." + typeName;
                         return typeName;
                     }
-                    throw new NotImplementedException();
+                    return "TODO_UNION_TYPE";
             };
         }
-        void GenerateProperties()
+        void GeneratePropertiesSource( JObject schema )
         {
-            IEnumerable<JProperty> props = ((JObject)_json["properties"]).Properties();
+            IEnumerable<JProperty> props = ((JObject)schema["properties"]).Properties();
             foreach( var prop in props )
             {
-                GenerateProperty( prop );
+                GeneratePropertySource( prop.Value as JObject, prop.Name );
+            }
+        }
+
+        void GenerateDefinitions( JObject schema )
+        {
+            JObject? defs = ((JObject?)schema["definitions"]);
+            if( defs is null ) return;
+            IEnumerable<JProperty> props = defs.Properties();
+            foreach( JProperty prop in props )
+            {
+                GenerateMethodsFromSchema( prop.Value as JObject, prop.Name );
             }
         }
     }
