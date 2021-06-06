@@ -1,5 +1,7 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+#nullable enable
 
 namespace ConsoleApp2
 {
@@ -9,6 +11,5 @@ namespace ConsoleApp2
 		{
             //Utf8JsonReader t = default;
 		}
-
-	}
+    }
 }
