@@ -44,7 +44,7 @@ namespace Kuinox.JsonVisitorGenerator
                             throw new FileNotFoundException();
                         }
                         SourceText text = file.GetText( context.CancellationToken )!;
-                        SourceGenerator sg = new( context, candidate, symbolInfo, text );
+                        SourceGenerator sg = new( context, candidate, symbolInfo, text, true );
                         string generatedSource = sg.GenerateSource();
                     }
                 }

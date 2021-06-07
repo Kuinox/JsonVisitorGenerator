@@ -37,7 +37,8 @@ namespace Kuinox.JsonVisitorGenerator
             _s.AppendLine(
 $@"using System.Text.Json;
 using System.Collections.Generic;
-using System.IO;" );
+using System.IO;
+using System;" );
         }
 
         public string GenerateSource()
@@ -69,8 +70,7 @@ using System.IO;" );
             _s.Append( schemaDefinition["title"] );
             _s.Append( "<br>" );
             _s.Append( schemaDefinition["description"] );
-            _s.Append( "</summary>" );
-            _s.Append( '\n' );
+            _s.Append( "</summary>\n" );
             _s.Append( accessLevel );
             _s.Append( " class " );
             _s.Append( schemaName );

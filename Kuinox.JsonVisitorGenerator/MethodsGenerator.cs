@@ -24,110 +24,39 @@ namespace Kuinox.JsonVisitorGenerator
             }
         }
 
-        void AppendArrayProcessing( JObject arrayDef, string className, bool isReading )
-        {
-            int recurseCount = 0;
-            string DoAppendArrayRead( JObject property, int recurseCount )
-            {
-                JObject arrayTypeDef = property["items"] as JObject;
-                string csType = JSTypeToCS( property["items"] as JObject, null );
-                string listName = "array" + recurseCount;
-                if( isReading )
-                {
-                    _s.AppendLine( $"List<{csType}> {listName} = new List<{csType}>();" );
-                }
-                _s.AppendLine( "reader.Read();" );
-                _s.AppendLine( "reader.Read();" );
-                _s.AppendLine( $@"while( reader.TokenType != JsonTokenType.EndArray )
-{{" );
-                if( IsBaseType( arrayTypeDef ) )
-                {
-                    if( isReading )
-                    {
-                        _s.AppendLine( $"{listName}.Add({GetBaseTypeReaderExpression( arrayTypeDef )});" );
-                    }
-                    _s.AppendLine( "reader.Read();" );
-                    // When we visit, because it's a single value, it will be skipped
-                }
-                else if( IsArray( arrayTypeDef ) )
-                {
-                    //TODO: test this.
-                    string newListName = DoAppendArrayRead( arrayTypeDef, recurseCount + 1 );
-                    if( isReading )
-                    {
-                        _s.AppendLine( $"{listName}.Add({newListName})" );
-                    }
-                }
-                else
-                {
-                    if( isReading )
-                    {
-                        _s.Append( $"{listName}.Add(" );
-                    }
-                    _s.Append( GetMethodThatProcess( property["items"] as JObject, isReading ? "Read" : "Visit" ) );
-                    if( isReading )
-                    {
-                        _s.Append( ')' );
-                    }
-                    _s.AppendLine( ";" );
-                }
-                _s.Append( '}' );
-                return listName;
-            }
-            string variableName = DoAppendArrayRead( arrayDef, recurseCount );
-            _s.AppendLine( $"return {variableName};" );
-        }
 
-        void GenerateVisitAndReadFromProperty( JObject definition, string defName, bool isMainMethod )
+
+        void GenerateVisitAndReadFromProperty( JObject propertyDef, string defName, bool isMainMethod )
         {
             string className = CamelToPascal( defName );
-            AppendVisitorDeclaration( definition, className, isMainMethod );
-            AppendReadDeclaration( definition, className, isMainMethod );
-        }
-
-        private void AppendVisitorDeclaration( JObject property, string thingBeingRead, bool isMainReadMethod )
-        {
-            _s.Append( $@"
-        /// <summary>
-        /// {property["description"]}
-        /// </summary>
-        {(isMainReadMethod ? "public" : "protected")} virtual void Visit{(isMainReadMethod ? "" : thingBeingRead)}(Utf8JsonReader reader)
-        {{
-" );
-            if( IsBaseType( property ) )
-            {
-                _s.AppendLine( "reader.Read();" );
-            }
-            else if( IsArray( property ) )
-            {
-                AppendArrayVisit( property, thingBeingRead );
-            }
-            else
-            {
-                _s.AppendLine( $"Visit{thingBeingRead}(reader);" );
-            }
+            AppendMethod( propertyDef, className, isMainMethod, false );
+            AppendMethod( propertyDef, className, isMainMethod, true );
         }
 
         /// <param name="thingBeingRead">Will be used to name the read method.</param>
-        void AppendReadDeclaration( JObject property, string thingBeingRead, bool isMainReadMethod )
+        void AppendMethod( JObject propertyDef, string thingBeingRead, bool isMainReadMethod, bool isReading )
         {
-            string csType = JSTypeToCS( property, thingBeingRead, true );
-            _s.Append(
-        $@"        }}
-        /// <summary>
-        /// {property["description"]}
-        /// </summary>
-        /// <returns>The parsed value.</returns>
-        {(isMainReadMethod ? "public" : "protected")} {csType} Read{(isMainReadMethod ? "" : thingBeingRead)}(Utf8JsonReader reader)
-        {{
-" );
-            if( IsBaseType( property ) )
+            string csType = JSTypeToCS( propertyDef, thingBeingRead, true );
+            _s.Append( "/// <summary>" );
+            _s.Append( propertyDef["description"] );
+            _s.Append( "</summary>\n" );
+            _s.Append( isMainReadMethod ? "public " : "protected " );
+            _s.Append( isReading ? csType : "void" );
+            _s.Append( ' ' );
+            _s.Append( isReading ? "Read" : "Visit" );
+            _s.Append( isMainReadMethod ? "" : thingBeingRead );
+            _s.Append( "(Utf8JsonReader reader){" );
+            if( IsBaseType( propertyDef ) )
             {
-                _s.AppendLine( $"return {GetBaseTypeReaderExpression( property )};" );
+                if( isReading )
+                {
+                    _s.AppendLine( $"return {GetBaseTypeReaderExpression( propertyDef )};" );
+                }
+                _s.AppendLine( "reader.Read();" );
             }
-            else if( IsArray( property ) )
+            else if( IsArray( propertyDef ) )
             {
-                AppendArrayRead( property, thingBeingRead );
+                AppendArrayProcessingImplementation( propertyDef, isReading );
             }
             else
             {
@@ -136,7 +65,7 @@ namespace Kuinox.JsonVisitorGenerator
                 _s.Append( @$"
                 reader.Read(); // Open Object.
                 reader.Read(); // first property.
-                while(reader.TokenType != JsonTokenType.EndArray)
+                while(reader.TokenType != JsonTokenType.EndObject)
                 {{
                     string property = reader.GetString();
                     switch(property)
@@ -146,6 +75,7 @@ namespace Kuinox.JsonVisitorGenerator
                             throw new InvalidDataException(""Unknown property"");
                     }}
                 }}
+                throw new NotImplementedException();
 " );
             }
             _s.AppendLine( "}" );
