@@ -58,7 +58,10 @@ namespace Kuinox.JsonVisitorGenerator
                 return listName;
             }
             string variableName = DoAppendArrayRead( arrayDef, recurseCount );
-            _s.AppendLine( $"return {variableName};" );
+            if( isReading )
+            {
+                _s.AppendLine( $"return {variableName};" );
+            }
         }
     }
 }
