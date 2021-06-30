@@ -22,6 +22,19 @@ namespace Kuinox.JsonVisitorGenerator
             public IEnumerable<string> Properties => _properties;
         }
 
+        public class TypeDefinition
+        {
+            public TypeDefinition[] Types { get; init; }
+
+            public string? BaseType { get; init; }
+            enum DefinitionType
+            {
+                BaseType,
+                UnionType,
+                DefinedType
+            }
+        }
+
         readonly Stack<string> _currentSchemaPath;
         readonly Dictionary<string, SchemaDefinition> _objDefs = new();
         readonly HashSet<string> _referencedSchema = new();
@@ -31,6 +44,39 @@ namespace Kuinox.JsonVisitorGenerator
 
         public IEnumerable<KeyValuePair<string, SchemaDefinition>> TreeShakedDefinitions
             => _objDefs.Where( s => _referencedSchema.Contains( s.Key ) );
+
+
+        TypeDefinition ReadType(ref Utf8JsonReader reader)
+        {
+            if( reader.TokenType == JsonTokenType.StartArray )
+            {
+                reader.Read();
+                List<TypeDefinition> types = new();
+                while(reader.TokenType != JsonTokenType.EndArray)
+                {
+                    types.Add( ReadType( ref reader ) );
+                }
+            }
+            else if( reader.TokenType == JsonTokenType.String )
+            {
+                string str = reader.GetString(); //TODO: error emit.
+                reader.Read();
+                return new TypeDefinition
+                {
+                    BaseType = str
+                };
+            }
+            else
+            {
+                throw new InvalidDataException();
+            }
+        }
+        protected override void VisitType( ref Utf8JsonReader reader )
+        {
+            ReadType();
+
+            base.VisitType( ref reader );
+        }
 
         public override void Visit( ref Utf8JsonReader reader )
         {
