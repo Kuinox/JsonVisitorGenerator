@@ -58,6 +58,36 @@ namespace Kuinox.JsonVisitorGenerator
                     case "additionalProperties":
                         VisitAdditionalProperties( ref reader );
                         break;
+                    case "minItems":
+                        VisitMinItems( ref reader );
+                        break;
+                    case "minimum":
+                        VisitMinimum( ref reader );
+                        break;
+                    case "exclusiveMinimum":
+                        VisitExclusiveMinimum( ref reader );
+                        break;
+                    case "exclusiveMaximum":
+                        VisitExclusiveMaximum( ref reader );
+                        break;
+                    case "allOf":
+                        VisitAllOf( ref reader );
+                        break;
+                    case "anyOf":
+                        VisitAnyOf( ref reader );
+                        break;
+                    case "default":
+                        VisitDefault( ref reader );
+                        break;
+                    case "enum":
+                        VisitEnum( ref reader );
+                        break;
+                    case "uniqueItems":
+                        VisitUniqueItems( ref reader );
+                        break;
+                    case "dependencies":
+                        VisitDependencies( ref reader );
+                        break;
                     case null:
                     default:
                         throw new InvalidDataException();
@@ -66,22 +96,111 @@ namespace Kuinox.JsonVisitorGenerator
             reader.Read(); //end obj
         }
 
+        protected virtual void VisitDependencies( ref Utf8JsonReader reader )
+        {
+            if( reader.TokenType == JsonTokenType.StartObject )
+            {
+                Visit( ref reader );
+            }
+            else if( reader.TokenType == JsonTokenType.StartArray )
+            {
+                reader.Read();
+                while( reader.TokenType != JsonTokenType.EndArray )
+                {
+                    VisitDepedencyEntry( ref reader );
+                }
+            }
+            else
+            {
+                throw new InvalidDataException();
+            }
+        }
+
+        protected virtual void VisitDepedencyEntry( ref Utf8JsonReader reader )
+        {
+            reader.Read();
+        }
+
+        protected virtual void VisitAnyOf( ref Utf8JsonReader reader )
+        {
+            reader.Read();//begin array.
+            while( reader.TokenType != JsonTokenType.EndArray )
+            {
+                VisitAnyOfEntry( ref reader );
+            }
+            reader.Read(); // read end array.
+        }
+
+        protected virtual void VisitAnyOfEntry( ref Utf8JsonReader reader )
+            => Visit( ref reader );
+
+        protected virtual void VisitUniqueItems( ref Utf8JsonReader reader )
+            => reader.Read();
+
+        protected virtual void VisitEnum( ref Utf8JsonReader reader )
+        {
+            reader.Read(); //start array
+            while( reader.TokenType != JsonTokenType.EndArray )
+            {
+                VisitEnumEntry( ref reader );
+            }
+            reader.Read(); //end array
+        }
+
+        protected virtual void VisitEnumEntry( ref Utf8JsonReader reader )
+        {
+            reader.Skip();
+            reader.Read();
+        }
+
+        protected virtual void VisitDefault( ref Utf8JsonReader reader )
+        {
+            reader.Skip();
+            reader.Read();
+        }
+
+        protected virtual void VisitAllOf( ref Utf8JsonReader reader )
+        {
+            reader.Read();//begin array.
+            while( reader.TokenType != JsonTokenType.EndArray )
+            {
+                VisitAllOfEntry( ref reader );
+            }
+            reader.Read(); // read end array.
+        }
+
+        protected virtual void VisitAllOfEntry( ref Utf8JsonReader reader )
+            => Visit( ref reader );
+
+        protected virtual void VisitExclusiveMinimum( ref Utf8JsonReader reader )
+        {
+            reader.Skip();
+            reader.Read();
+        }
+        protected virtual void VisitExclusiveMaximum( ref Utf8JsonReader reader )
+        {
+            reader.Skip();
+            reader.Read();
+        }
+
+        protected virtual void VisitMinimum( ref Utf8JsonReader reader )
+            => reader.Read();
+
+        protected virtual void VisitMinItems( ref Utf8JsonReader reader )
+            => reader.Read();
+
         protected virtual void VisitId( ref Utf8JsonReader reader )
-        {
-            reader.Read();
-        }
+            => reader.Read();
+
         protected virtual void VisitSchema( ref Utf8JsonReader reader )
-        {
-            reader.Read();
-        }
+            => reader.Read();
+
         protected virtual void VisitDescription( ref Utf8JsonReader reader )
-        {
-            reader.Read();
-        }
+            => reader.Read();
+
         protected virtual void VisitTitle( ref Utf8JsonReader reader )
-        {
-            reader.Read();
-        }
+            => reader.Read();
+
         protected virtual void VisitDefinitions( ref Utf8JsonReader reader )
         {
             reader.Read(); // read start obj.
@@ -124,20 +243,15 @@ namespace Kuinox.JsonVisitorGenerator
         }
 
         protected virtual void VisitPropertiesKey( ref Utf8JsonReader reader )
-        {
-            reader.Read();
-        }
+            => reader.Read();
 
         protected virtual void VisitPropertiesValue( ref Utf8JsonReader reader )
-        {
-            Visit( ref reader );
-        }
+            => Visit( ref reader );
         protected virtual void VisitType( ref Utf8JsonReader reader )
         {
             if( reader.TokenType == JsonTokenType.StartArray )
             {
-                reader.Skip();
-                reader.Read();
+                VisitTypeAnyOfField0( ref reader );
             }
             else if( reader.TokenType == JsonTokenType.String )
             {
@@ -149,10 +263,17 @@ namespace Kuinox.JsonVisitorGenerator
             }
         }
 
-        protected virtual void VisitPattern( ref Utf8JsonReader reader )
+        protected virtual void VisitTypeAnyOfField0( ref Utf8JsonReader reader )
         {
-            reader.Read(); //Read the pattern
+            reader.Skip();
+            reader.Read();
         }
+
+        protected virtual void VisitTypeAnyOfField1( ref Utf8JsonReader reader )
+            => reader.Read();
+
+        protected virtual void VisitPattern( ref Utf8JsonReader reader )
+            => reader.Read();
 
         protected virtual void VisitItems( ref Utf8JsonReader reader )
         {
@@ -175,14 +296,10 @@ namespace Kuinox.JsonVisitorGenerator
         }
 
         protected virtual void VisitRef( ref Utf8JsonReader reader )
-        {
-            reader.Read(); //Read "$ref".
-        }
+            => reader.Read(); //Read "$ref".
 
         protected virtual void VisitFormat( ref Utf8JsonReader reader )
-        {
-            reader.Read(); //Read "format".
-        }
+            => reader.Read(); //Read "format".
 
         protected virtual void VisitRequired( ref Utf8JsonReader reader )
         {

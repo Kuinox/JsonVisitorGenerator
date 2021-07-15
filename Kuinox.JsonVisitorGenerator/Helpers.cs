@@ -68,56 +68,6 @@ namespace Kuinox.JsonVisitorGenerator
 
         string StringToCName( string str ) => str.Replace( "$", "_d_" ).Replace( "/", "_" ).Replace( "#", "_n_" );
 
-        Dictionary<string, string> GetFriendlyName( ISet<string> paths )
-        {
-            Dictionary<string, string> correctNames = new();
-            HashSet<string> correctButNotPascal = new();
-            HashSet<string> containInvalidChars = new();
-            foreach( string path in paths )
-            {
-                string name = Path.GetFileName( path );
-                if( !SyntaxFacts.IsValidIdentifier( name ) )
-                {
-                    containInvalidChars.Add( path );
-                    continue;
-                }
-                if( char.IsUpper( name[0] ) )
-                {
-                    correctNames.Add( path, name );
-                }
-                else
-                {
-                    correctButNotPascal.Add( path );
-                }
-            }
-            foreach( string path in correctButNotPascal )
-            {
-                string name = Path.GetFileName( path );
-                string pascalified = char.ToUpperInvariant( name[0] ) + name.Remove( 1 );
-                if( correctNames.ContainsValue( pascalified ) )
-                {
-                    correctNames.Add( path, name ); //Original name is not pascal, but conflict with a pascal name.
-                }
-                else
-                {
-                    correctNames.Add( path, pascalified );
-                }
-            }
-            foreach( string path in containInvalidChars )
-            {
-                string name = Path.GetFileName( path );
-                Regex.Replace( name, "[^a-zA-Z]", "" );
-                string pascalified = char.ToUpperInvariant( name[0] ) + name.Remove( 1 );
-                string originalString = pascalified;
-                int i = 0;
-                while( correctNames.ContainsValue( pascalified ) )
-                {
-                    pascalified = originalString + i;
-                    if( i == int.MaxValue ) throw new InvalidOperationException( "Stop doing BS and fix your json schema." );
-                }
-                correctNames.Add( path, pascalified );
-            }
-            return correctNames;
-        }
+
     }
 }

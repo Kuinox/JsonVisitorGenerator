@@ -6,3 +6,7 @@ TODO:
 
 V2:
 - error handling in the generated parser.
+
+
+Tests:
+A schema that contains 2 types defs.
