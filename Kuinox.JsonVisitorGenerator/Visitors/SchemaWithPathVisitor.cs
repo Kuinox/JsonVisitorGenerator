@@ -12,6 +12,7 @@ namespace Kuinox.JsonVisitorGenerator.Visitors
         readonly Stack<string> _currentSchemaPath;
         public SchemaWithPathVisitor() => _currentSchemaPath = new( new[] { "#" } );
         protected string CurrentPath => string.Join( "/", _currentSchemaPath.Reverse() );
+        protected string CurrentSchemaName => _currentSchemaPath.Peek();
 
         protected override void VisitDefinitions( ref Utf8JsonReader reader )
         {
