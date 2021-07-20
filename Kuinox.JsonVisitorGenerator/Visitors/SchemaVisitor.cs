@@ -1,6 +1,7 @@
 using Kuinox.JsonVisitorGenerator.Visitors;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Text.Json;
@@ -24,7 +25,7 @@ namespace Kuinox.JsonVisitorGenerator
             SchemaDefinition def;
             if( _defsStack.Count == 0 )
             {
-                def = new SchemaDefinition( Array.Empty<SchemaDefinition>(), "#", ChildKind.Root );
+                def = new SchemaDefinition( this,Array.Empty<SchemaDefinition>(), "#", ChildKind.Root );
             }
             else
             {
@@ -115,16 +116,18 @@ namespace Kuinox.JsonVisitorGenerator
             base.VisitDefault( ref reader );
         }
 
-        protected override void VisitDefinitionsKey( ref Utf8JsonReader reader )
+        protected override void VisitDefinitionsValue( ref Utf8JsonReader reader )
         {
             _childKind = ChildKind.Definition;
-            base.VisitDefinitionsKey( ref reader );
+            base.VisitDefinitionsValue( ref reader );
+            Debug.Assert( _childKind == ChildKind.Invalid );
         }
 
-        protected override void VisitPropertiesKey( ref Utf8JsonReader reader )
+        protected override void VisitPropertiesValue( ref Utf8JsonReader reader )
         {
             _childKind = ChildKind.Property;
-            base.VisitPropertiesKey( ref reader );
+            base.VisitPropertiesValue( ref reader );
+            Debug.Assert( _childKind == ChildKind.Invalid );
         }
 
         protected override void VisitItems( ref Utf8JsonReader reader )
@@ -133,10 +136,16 @@ namespace Kuinox.JsonVisitorGenerator
             base.VisitItems( ref reader );
         }
 
-        protected override void VisitAdditionalProperties( ref Utf8JsonReader reader )
+        protected override void VisitAdditionalPropertiesField0( ref Utf8JsonReader reader )
         {
             _childKind = ChildKind.AdditionalProperty;
-            base.VisitAdditionalProperties( ref reader );
+            base.VisitAdditionalPropertiesField0( ref reader );
+        }
+
+        protected override void VisitAdditionalPropertiesField1( ref Utf8JsonReader reader )
+        {
+            CurrentDef.HaveAdditionoalProperties = reader.GetBoolean();
+            base.VisitAdditionalPropertiesField1( ref reader );
         }
 
         protected override void VisitDependencyField1Entry( ref Utf8JsonReader reader )

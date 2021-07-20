@@ -3,15 +3,9 @@ using Microsoft.CodeAnalysis.CSharp;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 #nullable enable
 
 namespace ConsoleApp2
@@ -20,8 +14,8 @@ namespace ConsoleApp2
     {
         public static void Main()
         {
-            var schema = File.ReadAllBytes( @"D:\Kuinox\Downloads\schema(1)" );
-            //var schema = File.ReadAllBytes( @"C:\dev\Kuinox.JsonVisitorGenerator\Tests\Kuinox.JsonVisitorGenerator.Tests\schema.json" );
+            //var schema = File.ReadAllBytes( @"D:\Kuinox\Downloads\schema(1)" );
+            var schema = File.ReadAllBytes( @"C:\dev\Kuinox.JsonVisitorGenerator\Tests\Kuinox.JsonVisitorGenerator.Tests\schema.json" );
             SchemaVisitor visitor = new();
             Utf8JsonReader reader = new( schema );
             reader.Read();
@@ -29,11 +23,11 @@ namespace ConsoleApp2
             visitor.Compute( "Schema" );
             visitor.Display();
             StringBuilder sb = new();
-            visitor.Definitions["#"].AppendClassDefinition( sb, visitor );
+            visitor.Definitions["#"].AppendClassDefinition( sb );
             foreach( var item in visitor.Definitions )
             {
                 if( item.Value.ChildKind != SchemaVisitor.ChildKind.Definition ) continue;
-                item.Value.AppendClassDefinition( sb, visitor );
+                item.Value.AppendClassDefinition( sb );
             }
             Console.WriteLine( sb );
         }

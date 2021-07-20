@@ -14,8 +14,11 @@ namespace Kuinox.JsonVisitorGenerator
         public class SchemaDefinition
         {
             readonly Dictionary<string, SchemaDefinition> _childs = new();
-            public SchemaDefinition( SchemaDefinition[] parents, string name, ChildKind childKind )
+            readonly SchemaVisitor _visitor;
+
+            public SchemaDefinition( SchemaVisitor visitor, SchemaDefinition[] parents, string name, ChildKind childKind )
             {
+                _visitor = visitor;
                 Parents = parents;
                 Name = name;
                 ChildKind = childKind;
@@ -47,10 +50,40 @@ namespace Kuinox.JsonVisitorGenerator
                 }
             }
 
+            public string Name { get; }
+            public ChildKind ChildKind { get; }
+            private string? _value;
+            public string? Value
+            {
+                get => _value;
+                set
+                {
+                    if( value == null ) throw new NullReferenceException( "Cannot set value to null." );
+                    if( _value != null ) throw new InvalidOperationException( "Can set the value only once." );
+                    _value = value;
+                }
+            }
+            public string Namespace => string.Join( ".", Parents.Append( this ).Select( s => s.SafeName + "Definition" ) );
+            public string FullNameWithNamespace => Namespace + "." + SafeName;
+            private string? _safeName;
+
+            public string? SafeName
+            {
+                get => _safeName ?? throw new NullReferenceException();
+                set
+                {
+                    if( _safeName != null ) throw new InvalidOperationException( "Cannot set this value twice." );
+                    _safeName = value;
+                }
+            }
+            public TypeKind Type { get; set; }
+
+            public bool HaveAdditionoalProperties { get; set; } = true;
+
             public SchemaDefinition CreateChild( string name, ChildKind childKind )
             {
                 Debug.Assert( childKind != ChildKind.Root );
-                SchemaDefinition def = new( Parents.Append( this ).ToArray(), name, childKind );
+                SchemaDefinition def = new( _visitor, Parents.Append( this ).ToArray(), name, childKind );
                 _childs[name] = def;
                 return def;
             }
@@ -80,6 +113,10 @@ namespace Kuinox.JsonVisitorGenerator
             {
                 Dictionary<string, string> correctNames = new();
                 correctNames[Name] = SafeName;
+                if( HaveAdditionoalProperties )
+                {
+                    correctNames["\"additionalProperties"] = "AdditionalProperties";
+                }
                 HashSet<string> correctButNotPascal = new();
                 HashSet<string> containInvalidChars = new();
                 foreach( string name in names )
@@ -148,7 +185,7 @@ namespace Kuinox.JsonVisitorGenerator
                 return correctNames;
             }
 
-            public void AppendClassDefinition( StringBuilder sb, SchemaVisitor visitor )
+            public void AppendClassDefinition( StringBuilder sb )
             {
                 sb.Append( "namespace " );
                 sb.Append( Namespace );
@@ -157,41 +194,68 @@ namespace Kuinox.JsonVisitorGenerator
                 sb.Append( '{' );
                 foreach( SchemaDefinition def in Childs.Values.Where( s => s.ChildKind == ChildKind.Property ) )
                 {
-                    def.AppendProperty( sb, visitor );
+                    def.AppendProperty( sb );
+                }
+                if( HaveAdditionoalProperties )
+                {
+
+                    SchemaDefinition? additionalProperty = Childs.Values.LastOrDefault( s => s.ChildKind == ChildKind.AdditionalProperty );
+
+                    sb.Append( "public " );
+                    if( additionalProperty != null )
+                    {
+                        sb.Append( additionalProperty.GetCSType() );
+                    }
+                    else
+                    {
+                        sb.Append( "System.Collections.Generic.Dictionary<string,object> " );
+                    }
+                    sb.Append( "AdditionalProperties {get; set;}" );
+
                 }
                 sb.Append( "}}" );
 
             }
 
-            string GetCSType( SchemaVisitor visitor )
+            string GetCSType()
             {
-                if( Type == TypeKind.EmptyObject ) return "object";
-                if( Type == TypeKind.Reference )
+                if( ChildKind == ChildKind.AdditionalProperty )
                 {
-                    if( Ref == null ) throw new InvalidOperationException( "Logic error. Ref type, but no ref registered." );
-                    SchemaDefinition referedDef = visitor.Definitions[Ref];
-                    return referedDef.FullNameWithNamespace;
+                    return $"System.Collections.Generic.Dictionary<string, {GetCSTypeInternal()}>";
                 }
-                return SimpleType switch
+                return GetCSTypeInternal();
+
+                string GetCSTypeInternal()
                 {
-                    "array" => "TODO_ARRAY",
-                    "boolean" => "bool",
-                    "integer" => "long",
-                    "number" => "double",
-                    "object" => "TODO_OBJECT",
-                    "string" => "string",
-                    null => "TODO_NOTSIMPLE",
-                    _ => "TODO_UNKNOWN_CASE"
-                };
+                    if( Type == TypeKind.EmptyObject ) return "object";
+                    if( Type == TypeKind.Reference )
+                    {
+                        if( Ref == null ) throw new InvalidOperationException( "Logic error. Ref type, but no ref registered." );
+                        SchemaDefinition referedDef = _visitor.Definitions[Ref];
+                        return referedDef.FullNameWithNamespace;
+                    }
+                    return SimpleType switch
+                    {
+                        "array" => (Childs.SingleOrDefault().Value?.GetCSType() ?? "object")+"[]",
+                        "boolean" => "bool",
+                        "integer" => "long",
+                        "number" => "double",
+                        "object" => FullNameWithNamespace,
+                        "string" => "string",
+                        null => "TODO_NOTSIMPLE",
+                        _ => "TODO_UNKNOWN_CASE"
+                    };
+                }
+
             }
-            void AppendProperty( StringBuilder sb, SchemaVisitor visitor )
+            void AppendProperty( StringBuilder sb )
             {
                 sb.Append( @$"
 /// <summary>
 /// In JSON, this property is named ""{Name}""
 /// </summary>
 public " );
-                sb.Append( GetCSType( visitor ) );
+                sb.Append( GetCSType() );
                 sb.Append( ' ' );
                 sb.Append( SafeName );
                 sb.Append( " {get; set;}" );
@@ -205,22 +269,7 @@ public " );
                 }
             }
 
-            public string Name { get; }
-            public ChildKind ChildKind { get; }
 
-            public string Namespace => string.Join( ".", Parents.Append( this ).Select( s => s.SafeName + "Definition" ) );
-            public string FullNameWithNamespace => Namespace + "." + SafeName;
-            private string? _safeName;
-            public string? SafeName
-            {
-                get => _safeName ?? throw new NullReferenceException();
-                set
-                {
-                    if( _safeName != null ) throw new InvalidOperationException( "Cannot set this value twice." );
-                    _safeName = value;
-                }
-            }
-            public TypeKind Type { get; set; }
         }
     }
 }

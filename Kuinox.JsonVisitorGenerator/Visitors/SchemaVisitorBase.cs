@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -10,6 +11,7 @@ namespace Kuinox.JsonVisitorGenerator
     {
         public virtual void Visit( ref Utf8JsonReader reader )
         {
+            if( reader.TokenType != JsonTokenType.StartObject ) throw new InvalidDataException( "Invalid json schema." );
             reader.Read();//Should be: start obj.
             while( reader.TokenType != JsonTokenType.EndObject )
             {
@@ -93,7 +95,9 @@ namespace Kuinox.JsonVisitorGenerator
                         break;
                     case null:
                     default:
-                        throw new InvalidDataException();
+                        reader.Skip();
+                        reader.Read();
+                        break;
                 }
             }
             reader.Read(); //end obj
@@ -269,10 +273,6 @@ namespace Kuinox.JsonVisitorGenerator
 
         protected virtual void VisitPropertiesKey( ref Utf8JsonReader reader )
         {
-            if( reader.GetString() == "dependencies" )
-            {
-
-            }
             reader.Read();
         }
 
@@ -342,16 +342,26 @@ namespace Kuinox.JsonVisitorGenerator
         {
             if( reader.TokenType == JsonTokenType.StartObject )
             {
-                Visit( ref reader );
+                VisitAdditionalPropertiesField0(ref reader );
             }
             else if( reader.TokenType == JsonTokenType.True || reader.TokenType == JsonTokenType.False )
             {
-                reader.Read();
+                VisitAdditionalPropertiesField1( ref reader );
             }
             else
             {
                 throw new InvalidDataException();
             }
+        }
+
+        protected virtual void VisitAdditionalPropertiesField0( ref Utf8JsonReader reader )
+        {
+            Visit( ref reader );
+        }
+
+        protected virtual void VisitAdditionalPropertiesField1( ref Utf8JsonReader reader )
+        {
+            reader.Read();
         }
     }
 }
