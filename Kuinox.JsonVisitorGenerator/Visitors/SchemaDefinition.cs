@@ -49,7 +49,6 @@ namespace Kuinox.JsonVisitorGenerator
                     _ref = value;
                 }
             }
-
             public string Name { get; }
             public ChildKind ChildKind { get; }
             private string? _value;
@@ -63,6 +62,7 @@ namespace Kuinox.JsonVisitorGenerator
                     _value = value;
                 }
             }
+            IEnumerable<string> DefPath => Parents.Append( this ).Select( s => s.Name );
             public string Namespace => string.Join( ".", Parents.Append( this ).Select( s => s.SafeName + "Definition" ) );
             public string FullNameWithNamespace => Namespace + "." + SafeName;
             private string? _safeName;
@@ -103,87 +103,41 @@ namespace Kuinox.JsonVisitorGenerator
                 }
             }
 
+            PocoType ToPocoType()
+            {
+                return new PocoType()
+                {
+                    TypeKind = Type switch
+                    {
+                        TypeKind.Constant => JsonVisitorGenerator.TypeKind.BaseType,
+                        TypeKind.Reference => JsonVisitorGenerator.TypeKind.Reference,
+                        TypeKind.EmptyObject => JsonVisitorGenerator.TypeKind.BaseType,
+                        TypeKind.Constraint => throw new InvalidOperationException(),
+                        TypeKind.Simple => JsonVisitorGenerator.TypeKind.BaseType,
+                        _ => throw new InvalidOperationException( "Unknown type kind." )
+                    }
+                };
+            }
+            public PocoModel ToPocoModel()
+            {
+                TypeReference reference = new( Parents.Append( this ).Select( s => s.Name ) );
+                PocoModel model = new( reference );
+                model.Properties = _childs
+                    .Where( s => s.Value.ChildKind == ChildKind.Property )
+                    .ToDictionary(
+                        s => s.Key,
+                        s => s.Value.ToPocoType()
+                    );
+                return model;
+            }
+
             SchemaDefinition GetChildByPath( string[] path )
             {
                 if( path.Length == 0 ) return this;
                 return _childs[path.First()].GetChildByPath( path.Skip( 1 ).ToArray() );
             }
 
-            Dictionary<string, string> GetFriendlyName( Dictionary<string, SchemaDefinition>.KeyCollection names )
-            {
-                Dictionary<string, string> correctNames = new();
-                correctNames[Name] = SafeName;
-                if( HaveAdditionoalProperties )
-                {
-                    correctNames["\"additionalProperties"] = "AdditionalProperties";
-                }
-                HashSet<string> correctButNotPascal = new();
-                HashSet<string> containInvalidChars = new();
-                foreach( string name in names )
-                {
-                    if( !SyntaxFacts.IsValidIdentifier( name ) )
-                    {
-                        containInvalidChars.Add( name );
-                        continue;
-                    }
-                    if( char.IsUpper( name[0] ) )
-                    {
-                        correctNames.Add( name, name );
-                    }
-                    else
-                    {
-                        correctButNotPascal.Add( name );
-                    }
-                }
-                foreach( string path in correctButNotPascal )
-                {
-                    string name = Path.GetFileName( path );
-                    string pascalified = char.ToUpperInvariant( name[0] ) + name.Remove( 0, 1 );
-                    if( correctNames.ContainsValue( pascalified ) )
-                    {
-                        correctNames.Add( path, name ); //Original name is not pascal, but conflict with a pascal name.
-                    }
-                    else
-                    {
-                        correctNames.Add( path, pascalified );
-                    }
-                }
-                int anonymousCounter = 0;
-                string GetAnonymousName()
-                {
-                    while( anonymousCounter >= 0 )
-                    {
-                        string typeName = "AnonymousType" + anonymousCounter;
-                        bool contains = correctNames.Values.Contains( typeName );
-                        anonymousCounter++;
-                        if( !contains ) return typeName;
-                    }
-                    throw new InvalidOperationException( "Can you stop doing stupid stuff ?" );
-                }
-                foreach( string name in containInvalidChars )
-                {
-                    string replacedName = Regex.Replace( name, "[^a-zA-Z0-9]", "" );
-                    if( string.IsNullOrEmpty( replacedName ) )
-                    {
-                        replacedName = GetAnonymousName();
-                    }
-                    else if( char.IsDigit( replacedName[0] ) )
-                    {
-                        replacedName = "Field" + replacedName;
-                    }
-
-                    string pascalified = char.ToUpperInvariant( replacedName[0] ) + replacedName.Remove( 0, 1 );
-                    string originalString = pascalified;
-                    int i = 0;
-                    while( correctNames.ContainsValue( pascalified ) )
-                    {
-                        pascalified = originalString + i;
-                        if( i == int.MaxValue ) throw new InvalidOperationException( "Stop doing BS and fix your json schema." );
-                    }
-                    correctNames.Add( name, pascalified );
-                }
-                return correctNames;
-            }
+           
 
             public void AppendClassDefinition( StringBuilder sb )
             {
@@ -227,6 +181,10 @@ namespace Kuinox.JsonVisitorGenerator
 
                 string GetCSTypeInternal()
                 {
+                    if( Name == "commonTaskPropertySets" )
+                    {
+                        //this is a good test case. 
+                    }
                     if( Type == TypeKind.EmptyObject ) return "object";
                     if( Type == TypeKind.Reference )
                     {
@@ -236,7 +194,7 @@ namespace Kuinox.JsonVisitorGenerator
                     }
                     return SimpleType switch
                     {
-                        "array" => (Childs.SingleOrDefault().Value?.GetCSType() ?? "object")+"[]",
+                        "array" => (Childs.SingleOrDefault().Value?.GetCSType() ?? "object") + "[]",
                         "boolean" => "bool",
                         "integer" => "long",
                         "number" => "double",
